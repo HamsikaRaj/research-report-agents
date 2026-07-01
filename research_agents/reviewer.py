@@ -1,7 +1,4 @@
-"""Reviewer agent, the last hop. Its output_type makes the pipeline return a
-typed ReportResult instead of free text, and its output guardrail rejects
-ungrounded answers.
-"""
+"""Reviewer agent: validates the findings and returns a structured ReportResult."""
 from __future__ import annotations
 
 from agents import Agent, Runner
@@ -32,13 +29,10 @@ def build_reviewer() -> Agent:
 
 
 async def ensure_report(final_output) -> ReportResult:
-    """Guarantee a validated, structured ReportResult.
+    """Return a validated ReportResult, running the Reviewer if the handoff was skipped.
 
-    If the Executor already handed off to the Reviewer, `final_output` is already a
-    ReportResult and we return it as-is (no extra model call). If the Executor
-    skipped the handoff and answered in prose, we run the Reviewer here so the
-    structured schema and the output guardrail always apply, validation is never
-    optional.
+    If the Executor already handed off, final_output is a ReportResult and is returned
+    as-is. Otherwise the Reviewer runs here so validation is never skipped.
     """
     if isinstance(final_output, ReportResult):
         return final_output

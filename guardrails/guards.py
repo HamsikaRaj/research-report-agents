@@ -1,14 +1,4 @@
-"""Input and output guardrails.
-
-These are deterministic (no extra LLM call), which keeps them fast, free, and
-fully explainable in an interview. The README notes where you'd swap in an
-LLM-based guardrail instead.
-
-  - input_pii_guardrail:  blocks empty/oversized queries and obvious PII (SSN,
-                          credit-card-shaped numbers) before the pipeline runs.
-  - output_quality_guardrail: blocks a final ReportResult that is ungrounded
-                          (no sources) or has an empty answer.
-"""
+"""Deterministic input and output guardrails."""
 from __future__ import annotations
 
 import re
@@ -24,7 +14,7 @@ from agents import (
 
 from research_agents.schemas import ReportResult
 
-# Loose patterns: US SSN and 13-16 digit card-like numbers (with/without separators).
+# US SSN and 13-16 digit card-like numbers.
 _SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 _CARD = re.compile(r"\b(?:\d[ -]?){13,16}\b")
 _MAX_QUERY_LEN = 2000
@@ -60,7 +50,7 @@ async def output_quality_guardrail(
     agent: Agent,
     output: ReportResult,
 ) -> GuardrailFunctionOutput:
-    """Trip if the final report is empty or ungrounded (claims with no sources)."""
+    """Trip if the final report is empty or cites no sources."""
     reason = ""
     if not output.answer.strip():
         reason = "empty answer"

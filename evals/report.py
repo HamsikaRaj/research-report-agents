@@ -1,9 +1,6 @@
-"""Offline eval report: run the whole golden set and print per-metric averages.
+"""Run the whole golden set and print per-item scores and per-metric averages.
 
     python -m evals.report
-
-Prints a per-item table and the overall averages you can paste into your resume
-summary (accuracy / groundedness / hallucination-faithfulness).
 """
 from __future__ import annotations
 

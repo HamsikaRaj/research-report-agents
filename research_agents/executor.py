@@ -1,6 +1,4 @@
-"""Executor agent, does the work. It has the three function tools plus the live
-MCP server's tools, and hands off to the Reviewer when its research is done.
-"""
+"""Executor agent: runs the function tools and MCP server, then hands off to the Reviewer."""
 from __future__ import annotations
 
 from agents import Agent
@@ -27,7 +25,7 @@ so the Reviewer can validate and format the final answer. Handing off is mandato
 
 
 def build_executor(mcp_server) -> Agent:
-    """Build the Executor wired to a *connected* MCPServerStdio instance."""
+    """Build the Executor, wired to a connected MCP server."""
     reviewer = build_reviewer()
     return Agent(
         name="Executor",

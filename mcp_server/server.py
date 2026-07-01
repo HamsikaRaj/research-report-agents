@@ -1,13 +1,6 @@
-"""A self-built MCP server (the "build your own MCP server" requirement).
+"""A self-built MCP server exposing two doc tools over stdio (FastMCP).
 
-It exposes two tools over stdio using FastMCP from the official `mcp` package:
-
-  - list_docs()        -> names of available docs
-  - docs_lookup(topic) -> the contents of the matching doc
-
-The Agents SDK consumes this server via MCPServerStdio, which launches this file
-as a subprocess (`python -m mcp_server.server`) and talks to it over stdin/stdout.
-Run it directly to smoke-test: `python -m mcp_server.server` (it will wait on stdio).
+Consumed by the Agents SDK via MCPServerStdio, which runs this file as a subprocess.
 """
 from __future__ import annotations
 
@@ -31,9 +24,8 @@ def list_docs() -> list[str]:
 def docs_lookup(topic: str) -> str:
     """Return the contents of the doc most relevant to `topic`.
 
-    Matching is layered so callers don't have to know exact filenames:
-    exact stem, then stem substring, then a content search that ranks docs by how
-    many of the topic's words appear in the doc body (so "Runner" finds agents.md).
+    Tries exact stem, then stem substring, then a content search that ranks docs by
+    topic-word overlap so callers don't need exact filenames (e.g. "Runner" -> agents).
 
     Args:
         topic: A concept such as "Runner", "needs_approval", "tripwire", or "mcp".
@@ -41,7 +33,6 @@ def docs_lookup(topic: str) -> str:
     topic_norm = topic.lower().strip().replace(" ", "_")
     docs = list(DOCS_DIR.glob("*.md"))
 
-    # 1) exact stem, then 2) stem substring.
     for p in docs:
         if p.stem == topic_norm:
             return p.read_text(encoding="utf-8")
@@ -49,7 +40,6 @@ def docs_lookup(topic: str) -> str:
         if topic_norm in p.stem or p.stem in topic_norm:
             return p.read_text(encoding="utf-8")
 
-    # 3) content search: score each doc by topic-word overlap with its body.
     words = [w for w in re.findall(r"[a-z0-9_]+", topic.lower()) if len(w) > 2]
     best, best_score = None, 0
     for p in docs:
@@ -65,5 +55,4 @@ def docs_lookup(topic: str) -> str:
 
 
 if __name__ == "__main__":
-    # FastMCP.run() defaults to the stdio transport, which is what MCPServerStdio expects.
     mcp.run()

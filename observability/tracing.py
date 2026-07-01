@@ -1,14 +1,7 @@
-"""Custom observability layer on top of the SDK's built-in tracing.
+"""Custom trace processor that logs per-step tokens, latency, and cost to JSONL.
 
-The SDK already records spans (agents, generations, tool calls) and exports them
-to the OpenAI dashboard. We *add* a processor (add_trace_processor, so the default
-exporter stays on) that writes one JSONL line per generation span with:
-
-    timestamp, trace_id, agent/span name, model, input/output tokens, latency_ms,
-    estimated cost (USD).
-
-This is the "latency / cost / token optimization" + "observability" requirement:
-after a run, `runs.jsonl` is a flat, greppable record you can sum or average.
+Runs alongside the SDK's built-in tracer via add_trace_processor, so the default
+exporter stays on.
 """
 from __future__ import annotations
 
@@ -23,12 +16,11 @@ from config import RUNS_LOG, estimate_cost
 
 
 def _usage_tokens(usage: Any) -> tuple[int, int]:
-    """Pull (input, output) token counts from a usage object across SDK versions."""
+    """Read (input, output) token counts from a usage dict or ResponseUsage object."""
     if usage is None:
         return 0, 0
 
     def get(key: str):
-        # Usage can be a dict (GenerationSpanData) or an object (ResponseUsage).
         if isinstance(usage, dict):
             return usage.get(key)
         return getattr(usage, key, None)
@@ -39,22 +31,18 @@ def _usage_tokens(usage: Any) -> tuple[int, int]:
 
 
 class JsonlCostProcessor(TracingProcessor):
-    """Writes per-generation-step telemetry to a JSONL file."""
-
     def __init__(self, path=RUNS_LOG) -> None:
         self.path = path
         self._starts: dict[str, float] = {}
         self._lock = threading.Lock()
 
-    # --- trace lifecycle (we only need spans, but the interface requires these) ---
-    def on_trace_start(self, trace) -> None:  # noqa: D401
+    def on_trace_start(self, trace) -> None:
         pass
 
     def on_trace_end(self, trace) -> None:
         pass
 
     def on_span_start(self, span) -> None:
-        # Record a monotonic start time so we can compute latency on span end.
         if span.span_id:
             self._starts[span.span_id] = time.monotonic()
 
@@ -62,11 +50,9 @@ class JsonlCostProcessor(TracingProcessor):
         start = self._starts.pop(span.span_id, None)
         latency_ms = round((time.monotonic() - start) * 1000, 1) if start else None
 
+        # Responses API keeps usage/model on span_data.response. Chat Completions
+        # keeps them on span_data directly.
         data = span.span_data
-        # Token usage + model live in different places depending on span type:
-        #   - Responses API  -> ResponseSpanData.response.{usage,model}
-        #   - Chat Completions -> GenerationSpanData.{usage,model}
-        # Everything else (agent/tool/turn spans) carries no usage: skip it.
         response = getattr(data, "response", None)
         usage = getattr(response, "usage", None) if response is not None else None
         model = getattr(response, "model", None) if response is not None else None
@@ -75,12 +61,12 @@ class JsonlCostProcessor(TracingProcessor):
         if model is None:
             model = getattr(data, "model", None)
 
-        in_tok, out_tok = _usage_tokens(usage)
+        # Skip spans with no model: non-model spans and usage-only duplicates. This
+        # keeps one record per real model call so token and cost totals stay exact.
         if not model:
-            # No identifiable model means either a non-model span (agent/tool/turn)
-            # or a usage-only duplicate span. Skipping keeps per-model token and
-            # cost accounting exact (one record per real model call).
             return
+
+        in_tok, out_tok = _usage_tokens(usage)
         record = {
             "ts": time.time(),
             "trace_id": getattr(span, "trace_id", None),
@@ -89,7 +75,7 @@ class JsonlCostProcessor(TracingProcessor):
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "latency_ms": latency_ms,
-            "est_cost_usd": round(estimate_cost(model or "", in_tok, out_tok), 6),
+            "est_cost_usd": round(estimate_cost(model, in_tok, out_tok), 6),
         }
         with self._lock:
             with open(self.path, "a", encoding="utf-8") as f:

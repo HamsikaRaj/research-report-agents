@@ -1,9 +1,4 @@
-"""Shared eval harness used by both the report script and the pytest suite.
-
-Flow: for each golden item -> run the full Planner->Executor->Reviewer pipeline ->
-take the ReportResult.answer -> judge it -> collect scores. Returns per-item rows
-plus per-metric averages.
-"""
+"""Shared eval harness: run each golden item through the pipeline and judge it."""
 from __future__ import annotations
 
 import json
@@ -27,13 +22,11 @@ def load_golden() -> list[dict]:
 async def _answer_one(planner, query: str) -> str:
     """Run the pipeline non-streamed and return the final answer text."""
     result = await Runner.run(planner, query)
-    # Auto-reject any write approval so evals stay non-interactive.
     while result.interruptions:
         state = result.to_state()
         for interruption in result.interruptions:
             state.reject(interruption)
         result = await Runner.run(planner, state)
-    # Judge the same validated answer the pipeline delivers to users.
     report = await ensure_report(result.final_output)
     return report.answer
 
