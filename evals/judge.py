@@ -1,15 +1,8 @@
-"""LLM-as-judge.
+"""LLM-as-judge scoring an answer on accuracy, groundedness, and faithfulness.
 
-A dedicated judge Agent scores one answer on three metrics, each 0.0-1.0 where
-HIGHER IS BETTER:
-
-  - accuracy:     does the answer match the reference/expected answer?
-  - groundedness: is every claim supported by the reference (no unsupported extras)?
-  - hallucination: faithfulness score, 1.0 means NO hallucinated content, 0.0 means
-                   the answer is largely fabricated. (Named per the JD. Higher = safer.)
-
-Using structured `output_type=JudgeScores` means the judge returns typed numbers we
-can threshold in tests, not prose we have to parse.
+Each metric is 0.0-1.0, higher is better. Faithfulness is 1.0 when the answer has no
+fabricated or contradictory claims. output_type=JudgeScores returns typed numbers we
+can threshold in tests instead of prose.
 """
 from __future__ import annotations
 

@@ -1,13 +1,7 @@
-"""CLI entry point: run the Research-and-Report pipeline end to end.
+"""Command-line entry point: run the pipeline with streaming, approval, and retries.
 
     python main.py "How do handoffs work in the Agents SDK?"
-    python main.py "Summarize tracing and SAVE a report on it"   # triggers HITL
-
-What this file demonstrates:
-  - Runner.run_streamed + stream_events() rendered token-by-token.
-  - Built-in tracing + our custom JSONL cost processor (add_trace_processor).
-  - A human-in-the-loop approval gate for the save_report write action.
-  - A retry wrapper around transient failures.
+    python main.py "Summarize tracing and SAVE a report on it"
 """
 from __future__ import annotations
 
@@ -25,10 +19,11 @@ from openai.types.responses import ResponseTextDeltaEvent
 
 from research_agents.pipeline import build_pipeline, make_mcp_server
 from research_agents.reviewer import ensure_report
+from research_agents.schemas import ReportResult
 from observability.tracing import JsonlCostProcessor
 
 MAX_RETRIES = 2
-# Substrings that mark a *non-transient* failure: retrying won't help, so fail fast.
+# Failures where retrying cannot help, so we stop immediately.
 NON_RETRYABLE = ("insufficient_quota", "invalid_api_key", "quota", "billing", "permission")
 
 
@@ -51,7 +46,7 @@ async def _consume_stream(result) -> None:
 
 
 def _prompt_approval(interruption) -> bool:
-    """Ask the human to approve a paused tool call (the write gate)."""
+    """Ask the human to approve a paused tool call."""
     name = getattr(interruption, "name", None) or getattr(
         getattr(interruption, "raw_item", None), "name", "tool"
     )
@@ -80,7 +75,7 @@ async def _run_once(planner, query: str):
 
 
 async def run_with_retries(planner, query: str):
-    """Retry transient failures. Never retry a guardrail tripwire (input won't change)."""
+    """Retry transient failures with backoff. Fail fast on guardrails and quota/auth."""
     attempt = 0
     while True:
         try:
@@ -90,9 +85,8 @@ async def run_with_retries(planner, query: str):
             info = e.guardrail_result.output.output_info
             print(f"\n\n[guardrail] {kind} guardrail blocked the run: {info}")
             return None
-        except Exception as e:  # transient API / network errors
+        except Exception as e:
             if any(s in str(e).lower() for s in NON_RETRYABLE):
-                # Auth/quota/billing: the input is fine but the account can't serve it.
                 print(f"\n\n[error] non-retryable failure (check billing/API key): {e}")
                 raise
             attempt += 1
@@ -110,7 +104,6 @@ async def main() -> None:
 
     query = " ".join(sys.argv[1:]) or "How do handoffs work in the Agents SDK?"
 
-    # Built-in tracing stays on. We *add* our JSONL token/latency/cost processor.
     add_trace_processor(JsonlCostProcessor())
 
     print(f"[query] {query}\n")
@@ -120,10 +113,6 @@ async def main() -> None:
 
     if result is None:
         return
-
-    # Guarantee a validated, structured ReportResult (runs the Reviewer if the
-    # Executor skipped the handoff). No-op when the handoff already produced one.
-    from research_agents.schemas import ReportResult
 
     reviewed_via_handoff = isinstance(result.final_output, ReportResult)
     report = await ensure_report(result.final_output)

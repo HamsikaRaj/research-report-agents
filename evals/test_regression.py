@@ -1,13 +1,8 @@
-"""Pytest regression gate.
+"""Pytest gate: fail if judged averages fall below thresholds.
 
-Fails if the judged averages drop below thresholds, this is the "evaluation
-framework" requirement. Skips automatically if OPENAI_API_KEY is unset so it does
-not fail in a keyless CI environment.
+Skips when OPENAI_API_KEY is unset so a keyless CI does not fail.
 
     pytest evals/test_regression.py -v
-
-Tune thresholds after your first real run: set them a little below your observed
-averages so genuine regressions fail but normal model variance does not.
 """
 from __future__ import annotations
 

@@ -1,14 +1,4 @@
-"""Three function tools exposed to the Executor agent.
-
-Each is a plain Python function wrapped with @function_tool. The decorator reads
-the type hints + docstring to build the JSON schema the model sees, and validates
-the model's arguments against our Pydantic models before our code runs.
-
-  1. web_search    - stand-in retrieval over a tiny in-memory corpus.
-  2. compute_metric- deterministic math (real, fully auditable).
-  3. save_report   - the only "write" action. Gated with needs_approval=True
-                     so a human must approve before anything hits disk.
-"""
+"""The three function tools the Executor can call."""
 from __future__ import annotations
 
 import re
@@ -18,8 +8,7 @@ from agents import RunContextWrapper, function_tool
 from research_agents.schemas import MetricRequest, Operation, SaveReportRequest, SearchQuery
 from config import REPORTS_DIR
 
-# A tiny, deterministic "search index". In a real system this is a web search or
-# vector DB. We keep it local so the portfolio repo runs with zero extra keys.
+# Stands in for a real search backend or vector DB so the repo runs with only an API key.
 _CORPUS: dict[str, str] = {
     "responses api": "The Responses API is OpenAI's primary interface for model "
     "calls. It supports streaming events, tool calls, and structured outputs.",
@@ -34,10 +23,7 @@ _CORPUS: dict[str, str] = {
 
 @function_tool
 def web_search(args: SearchQuery) -> str:
-    """Search the knowledge base for snippets relevant to a query.
-
-    Ranks every entry by how many query words appear in its key+text, so it matches
-    on meaning rather than requiring an exact key.
+    """Search the knowledge base, ranking entries by query-word overlap.
 
     Args:
         args: The validated search query and result count.
@@ -67,18 +53,16 @@ def compute_metric(args: MetricRequest) -> str:
         result = sum(vals)
     elif args.operation is Operation.mean:
         result = sum(vals) / len(vals)
-    else:  # percent_change: first -> last
+    else:
         if vals[0] == 0:
             return "ERROR: percent_change undefined when the first value is 0."
         result = (vals[-1] - vals[0]) / abs(vals[0]) * 100
     return f"{args.operation.value} = {result:.4g}"
 
 
-# needs_approval=True turns every call into a run "interruption": the Runner pauses
-# and the host application (CLI) must approve or reject before the function runs.
 @function_tool(needs_approval=True)
 def save_report(ctx: RunContextWrapper, args: SaveReportRequest) -> str:
-    """Persist the final report to disk. Requires human approval before writing.
+    """Persist the final report to disk. Pauses for human approval before writing.
 
     Args:
         args: The report title and body to save.

@@ -1,9 +1,6 @@
-"""Summarize runs.jsonl into the headline numbers for your resume.
+"""Summarize runs.jsonl: total tokens, cost, mean latency, and a per-model breakdown.
 
     python -m observability.summarize
-
-Reads the per-step log written by JsonlCostProcessor and prints totals/averages:
-total tokens, total estimated cost, mean per-step latency, and a per-model breakdown.
 """
 from __future__ import annotations
 

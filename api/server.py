@@ -1,13 +1,11 @@
-"""FastAPI app that streams the pipeline over Server-Sent Events (SSE).
+"""FastAPI app that streams the pipeline over Server-Sent Events.
 
     uvicorn api.server:app --reload
     curl -N -X POST localhost:8000/stream -H 'content-type: application/json' \
          -d '{"query":"How do handoffs work?"}'
 
-This is the "Responses API streaming over an HTTP endpoint" requirement: each token
-delta and lifecycle event is forwarded to the client as a `data:` SSE frame. The
-endpoint is non-interactive, so a paused write action is surfaced as an
-`approval_required` event and then auto-rejected (the CLI is where a human approves).
+The endpoint is non-interactive, so a paused write action is reported as an
+approval_required event and declined. The CLI is where a human approves.
 """
 from __future__ import annotations
 
@@ -25,7 +23,6 @@ from observability.tracing import JsonlCostProcessor
 
 app = FastAPI(title="Research-and-Report Agents")
 
-# Register the custom cost/latency processor once for the API process.
 add_trace_processor(JsonlCostProcessor())
 
 
@@ -58,7 +55,6 @@ async def event_stream(query: str):
         async for frame in _emit(result):
             yield frame
 
-        # Non-interactive: surface and auto-reject any write approval.
         while result.interruptions:
             state = result.to_state()
             for interruption in result.interruptions:

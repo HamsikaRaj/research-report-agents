@@ -1,7 +1,4 @@
-"""Planner agent, the entry point. It decomposes the query into steps and hands
-off to the Executor, attaching the steps as a structured PlanHandoff payload. Its
-input guardrail screens the user query before any model work happens.
-"""
+"""Planner agent: decomposes the query and hands off to the Executor."""
 from __future__ import annotations
 
 import sys
