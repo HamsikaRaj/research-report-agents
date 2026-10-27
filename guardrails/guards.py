@@ -1,7 +1,7 @@
-"""Deterministic input and output guardrails."""
+"""Input and output guardrails. The detection logic lives in detectors.py (pure,
+SDK-free). These wrappers adapt it to the Agents SDK interface.
+"""
 from __future__ import annotations
-
-import re
 
 from agents import (
     Agent,
@@ -12,12 +12,8 @@ from agents import (
     output_guardrail,
 )
 
+from guardrails.detectors import pii_reason, quality_reason
 from research_agents.schemas import ReportResult
-
-# US SSN and 13-16 digit card-like numbers.
-_SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-_CARD = re.compile(r"\b(?:\d[ -]?){13,16}\b")
-_MAX_QUERY_LEN = 2000
 
 
 @input_guardrail
@@ -28,16 +24,7 @@ async def input_pii_guardrail(
 ) -> GuardrailFunctionOutput:
     """Trip if the input is empty, too long, or contains obvious PII."""
     text = user_input if isinstance(user_input, str) else str(user_input)
-    reason = ""
-    if not text.strip():
-        reason = "empty query"
-    elif len(text) > _MAX_QUERY_LEN:
-        reason = f"query exceeds {_MAX_QUERY_LEN} chars"
-    elif _SSN.search(text):
-        reason = "looks like it contains an SSN"
-    elif _CARD.search(text):
-        reason = "looks like it contains a card number"
-
+    reason = pii_reason(text)
     return GuardrailFunctionOutput(
         output_info={"reason": reason or "ok"},
         tripwire_triggered=bool(reason),
@@ -51,12 +38,7 @@ async def output_quality_guardrail(
     output: ReportResult,
 ) -> GuardrailFunctionOutput:
     """Trip if the final report is empty or cites no sources."""
-    reason = ""
-    if not output.answer.strip():
-        reason = "empty answer"
-    elif not output.sources:
-        reason = "answer cites no sources (possible hallucination)"
-
+    reason = quality_reason(output.answer, output.sources)
     return GuardrailFunctionOutput(
         output_info={"reason": reason or "ok"},
         tripwire_triggered=bool(reason),

@@ -87,6 +87,10 @@ python -m evals.report
 # Regression gate (fails if scores drop below thresholds)
 pytest evals/test_regression.py -v
 
+# Adversarial guardrail eval and its gate (deterministic, no API key needed)
+python -m evals.adversarial
+pytest evals/test_guardrails.py -v
+
 # Token, latency, and cost rollup from the run log
 python -m observability.summarize
 ```
@@ -113,9 +117,11 @@ through `MCPServerStdio`, which launches the server as a subprocess. The same st
 server could be consumed by any MCP client. If it were deployed behind a URL you would
 switch to `HostedMCPTool`.
 
-**Guardrails.** The input guardrail blocks empty or oversized queries and obvious PII.
-The output guardrail rejects a final answer that cites no sources. Both are
-deterministic, which keeps them fast and easy to reason about. See `guardrails/`.
+**Guardrails.** The input guardrail blocks empty or oversized queries and obvious PII
+(social security numbers, card numbers, emails). The output guardrail rejects a final
+answer that cites no sources. The detection logic lives in `guardrails/detectors.py`,
+a pure module with no SDK dependency, so it is unit-tested against an adversarial set
+in `evals/test_guardrails.py` with no API key. See `guardrails/`.
 
 **Human in the loop.** `save_report` is the only write action. It is marked
 `needs_approval=True`, so the run pauses as an interruption and waits for a person to
@@ -165,6 +171,15 @@ Evaluation over 15 golden cases, judged by gpt-4o:
 The judge scores each metric from 0 to 1, where higher is better. Faithfulness is 1.0
 when the answer contains no fabricated or contradictory claims. The regression gate
 requires each average to stay above 0.85.
+
+Guardrails, against an adversarial set of crafted PII inputs and low-quality outputs:
+
+| Measure | Value |
+| --- | --- |
+| Adversarial inputs blocked | 16 of 16 |
+| False positives on benign controls | 0 of 8 |
+
+This check is deterministic and runs without an API key. See `evals/adversarial.py`.
 
 ## Notes and next steps
 

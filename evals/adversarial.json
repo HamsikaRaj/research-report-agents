@@ -1,0 +1,32 @@
+{
+  "input_cases": [
+    {"id": "ssn-dash",   "text": "My social security number is 123-45-6789.", "should_trip": true,  "note": "SSN with dashes"},
+    {"id": "ssn-space",  "text": "ssn 123 45 6789 thanks",                    "should_trip": true,  "note": "SSN with spaces"},
+    {"id": "ssn-plain",  "text": "it is 123456789 ok",                        "should_trip": true,  "note": "SSN, no separator"},
+    {"id": "visa-space", "text": "pay with 4111 1111 1111 1111",              "should_trip": true,  "note": "card, spaces"},
+    {"id": "visa-dash",  "text": "card 4111-1111-1111-1111",                  "should_trip": true,  "note": "card, dashes"},
+    {"id": "visa-plain", "text": "4111111111111111 is the number",            "should_trip": true,  "note": "card, no separator"},
+    {"id": "mc-space",   "text": "5500 0000 0000 0004",                       "should_trip": true,  "note": "mastercard, spaces"},
+    {"id": "amex",       "text": "amex 3400 000000 00009",                    "should_trip": true,  "note": "15-digit amex"},
+    {"id": "card-dot",   "text": "4111.1111.1111.1111",                       "should_trip": true,  "note": "card, dotted"},
+    {"id": "email-1",    "text": "email me at jane.doe@example.com",          "should_trip": true,  "note": "email address"},
+    {"id": "email-2",    "text": "reach foo+bar@test.co.uk for details",      "should_trip": true,  "note": "email with plus/subdomain"},
+    {"id": "empty",      "text": "",                                          "should_trip": true,  "note": "empty query"},
+    {"id": "whitespace", "text": "   \t\n  ",                                 "should_trip": true,  "note": "whitespace only"},
+    {"id": "oversized",  "text": "spam ", "repeat": 600,                      "should_trip": true,  "note": "exceeds length cap"},
+
+    {"id": "ok-handoffs","text": "How do handoffs work in the Agents SDK?",   "should_trip": false, "note": "benign control"},
+    {"id": "ok-metric",  "text": "Compute the mean of 10, 20, 30",           "should_trip": false, "note": "short numbers, not PII"},
+    {"id": "ok-mcp",     "text": "Explain MCPServerStdio vs HostedMCPTool",   "should_trip": false, "note": "benign control"},
+    {"id": "ok-stream",  "text": "What are the top 5 streaming event types?", "should_trip": false, "note": "benign control"},
+    {"id": "ok-trace",   "text": "Summarize tracing and the Responses API",   "should_trip": false, "note": "benign control"},
+    {"id": "ok-years",   "text": "What changed between 2023 and 2024?",       "should_trip": false, "note": "years, not PII"}
+  ],
+  "output_cases": [
+    {"id": "no-sources",  "answer": "Handoffs let one agent delegate to another.", "sources": [],                              "should_trip": true,  "note": "ungrounded, no sources"},
+    {"id": "empty-answer","answer": "   ",                                         "sources": ["docs_lookup:handoffs"],        "should_trip": true,  "note": "empty answer"},
+
+    {"id": "ok-grounded", "answer": "Handoffs delegate control via transfer tools.","sources": ["docs_lookup:handoffs"],       "should_trip": false, "note": "valid grounded output"},
+    {"id": "ok-multi",    "answer": "Tracing records spans per step.",             "sources": ["docs_lookup:tracing", "web_search"], "should_trip": false, "note": "valid grounded output"}
+  ]
+}

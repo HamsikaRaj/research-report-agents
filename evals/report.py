@@ -27,6 +27,13 @@ async def main() -> None:
     overall = round(sum(averages.values()) / len(METRICS), 3)
     print(f"  {'OVERALL':<13} {overall:.3f}")
 
+    pass_mark = 0.8
+    passed = sum(
+        1 for r in rows if sum(r[m] for m in METRICS) / len(METRICS) >= pass_mark
+    )
+    pct = round(100 * passed / len(rows))
+    print(f"  {'PASS RATE':<13} {passed}/{len(rows)} ({pct}%) at overall >= {pass_mark}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
